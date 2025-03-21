@@ -1,0 +1,65 @@
+<strong>Client</strong><br />
+Current value: <strong id="current-value" aria-live="polite">???</strong><br />
+<br />
+<button data-increment aria-controls="current-value">Increment</button>
+
+<script type="module">
+  // import {
+  //   getPublicKey,
+  //   signTransaction,
+  // } from "/home/rohit/gorillaPay-astro/src/components/ConnectWallet.js";
+  import { signTransaction } from "@stellar/freighter-api";
+
+  import Client from "../src/contracts/gorillaPay.ts";
+  
+  
+
+  // Get the button and current value elements
+  const button = document.querySelector("[data-increment]");
+  const currentValue = document.querySelector("#current-value");
+
+  button.addEventListener("click", async () => {
+    // Get user's public key from Freighter
+    const publicKey = await getPublicKey();
+
+    if (!publicKey) {
+      alert("Please connect your wallet first");
+      return;
+    } else {
+      // Set public key and signing method for the Client contract
+      Client.options.publicKey = publicKey;
+      Client.options.signTransaction = signTransaction;
+    }
+
+    // Disable button and show loading state
+    button.disabled = true;
+    button.classList.add("loading");
+    currentValue.innerHTML =
+      currentValue.innerHTML +
+      '<span class="visually-hidden"> – updating…</span>';
+
+    try {
+      // Send the transaction to update fees
+    
+
+      const address =
+        "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
+      // const tx = await Client.set_sep41({
+      //   sep41_address: address,
+      // });
+      console.log({Client});
+      const tx = await Client.set_fees_parameter({fee_numerator:1,fee_denominator:1})
+      const { result } = await tx.signAndSend();
+
+      // Update the current value if the transaction is successful
+      currentValue.innerHTML = result.toString();
+    } catch (e) {
+      console.error("Transaction failed:", e);
+      alert("Transaction failed. Check the console for more details.");
+    } finally {
+      // Re-enable the button and remove loading state
+      button.disabled = false;
+      button.classList.remove("loading");
+    }
+  });
+</script>
