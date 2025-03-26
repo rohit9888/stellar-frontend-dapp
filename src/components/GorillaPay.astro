@@ -8,10 +8,11 @@ Current value: <strong id="current-value" aria-live="polite">???</strong><br />
   //   getPublicKey,
   //   signTransaction,
   // } from "/home/rohit/gorillaPay-astro/src/components/ConnectWallet.js";
-  import { signTransaction } from "@stellar/freighter-api";
+  // import { signTransaction } from "@stellar/freighter-api";
 
   import Client from "../src/contracts/gorillaPay.ts";
-  
+  import { getPublicKey, signTransaction,xlmToStroop } from "/home/rohit/gorillaPay-astro/src/components/stellar-wallets-kit.js";
+  import { Soroban } from "@stellar/stellar-sdk";
   
 
   // Get the button and current value elements
@@ -29,7 +30,42 @@ Current value: <strong id="current-value" aria-live="polite">???</strong><br />
       // Set public key and signing method for the Client contract
       Client.options.publicKey = publicKey;
       Client.options.signTransaction = signTransaction;
-    }
+
+  //     const signWithFreighter = async () => {
+  //   // Need to use the perviously fetched token decimals to properly display the quantity value
+  //   const quantity = Soroban.parseTokenAmount(
+  //     1,
+  //     7,
+  //   );
+
+  //   // Get an instance of a Soroban RPC set to the selected network
+  //   const server = getServer("testnet");
+  //   // Gets a transaction builder and use it to add a "mint" operation and build the corresponding XDR
+  //   const txBuilderAdmin = await getTxBuilder(
+  //   publicKey,
+  //     xlmToStroop(1).toString(),
+  //     server,
+  //     "Test SDF Network ; September 2015",
+  //   );
+
+  //   const xdr = await payMerchant({
+  //     tokenId: "gold:GBFV6WZEHOEWCN5HLG2XV6L5GA5J34UBQ7GH4F5W3OFDP2BFFR4IZBAF",
+  //     quantity: Number(quantity),
+  //     destinationPubKey: "CBHBK376ZLB4URZTOCOZQE3QD7CJLDTNKCJASFNPUZ35LMUFSRL27E43",
+  //     // memo: props.memo,
+  //     txBuilderAdmin,
+  //     server,
+  //   });
+
+  //   try {
+  //     // Signs XDR representing the "mint" transaction
+  //     const signedTx = await signTx(xdr, publicKey, signTransaction);
+  //     props.onTxSign(signedTx);
+  //   } catch (e) {
+  //     props.setError(ERRORS.UNABLE_TO_SIGN_TX);
+  //   }
+  // };
+  //   }
 
     // Disable button and show loading state
     button.disabled = true;
@@ -48,11 +84,118 @@ Current value: <strong id="current-value" aria-live="polite">???</strong><br />
       //   sep41_address: address,
       // });
       console.log({Client});
-      const tx = await Client.set_fees_parameter({fee_numerator:1,fee_denominator:1})
-      const { result } = await tx.signAndSend();
+      import { 
+  Contract, 
+  SorobanRpc, 
+  TransactionBuilder, 
+  Networks, 
+  Keypair,
+  Operation,
+  Asset,
+  Address,
+  xdr,
+  nativeToScVal,
+  scValToNative
+} from '@stellar/stellar-sdk';
 
+// Step 1: User approves the contract to spend USDC
+async function approveUSDC(userSecretKey, contractId, amount) {
+  const rpc = new SorobanRpc.Server("https://soroban-testnet.stellar.org");
+  const userKeypair = Keypair.fromSecret(userSecretKey);
+  
+  // Get USDC token contract ID (after creating Stellar Asset Contract for USDC)
+  const usdcIssuer = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"; // Example - use actual USDC issuer
+  const usdc = new Asset("USDC", usdcIssuer);
+  
+  // First ensure the Stellar Asset Contract exists for USDC
+  // This only needs to be done once for the asset
+  // For this example, we'll assume it's already been created
+  
+  // Get the token contract ID
+  const usdcContractId = await getAssetContractId(usdc);
+  const tokenContract = new Contract(usdcContractId);
+  
+  const account = await rpc.getAccount(publicKey);
+  
+  // Create and submit approval transaction
+  const txs = new TransactionBuilder(account, {
+    fee: "100000",
+    networkPassphrase: Networks.TESTNET
+  })
+  .addOperation(
+    tokenContract.call(
+      "approve", 
+      {
+        from: Address.fromString(userKeypair.publicKey()),
+        spender: Address.fromString(contractId),
+        amount: xdr.ScVal.scvU128(new xdr.Uint128(BigInt(amount * 10000000))),
+        expiration_ledger: xdr.ScVal.scvU32(0) // No expiration
+      }
+    )
+  )
+  .setTimeout(30)
+  .build();
+  
+  // Sign and submit the transaction
+  tx.sign(userKeypair);
+  return await rpc.sendTransaction(tx);
+}
+
+// Step 2: Your contract calls transferFrom to receive the approved tokens
+// This would typically be implemented in your Rust contract
+// Here's how it would look in JavaScript when testing
+async function transferFromTest(contractId, userAddress, amount) {
+  // This simulates what your contract would do internally
+  const rpc = new SorobanRpc.Server("https://soroban-testnet.stellar.org");
+  
+  // Get your contract instance
+  const myContract = new Contract(contractId);
+  const adminKeypair = Keypair.fromSecret("YOUR_CONTRACT_ADMIN_SECRET");
+  
+  // Get USDC token contract
+  const usdcIssuer = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"; 
+  const usdc = new Asset("USDC", usdcIssuer);
+  const usdcContractId = await getAssetContractId(usdc);
+  const tokenContract = new Contract(usdcContractId);
+  
+  const account = await rpc.getAccount(adminKeypair.publicKey());
+  
+  // This would be done inside your contract, not in JS
+  const tx = new TransactionBuilder(account, {
+    fee: "100000",
+    networkPassphrase: Networks.TESTNET
+  })
+  .addOperation(
+    tokenContract.call(
+      "transfer_from",
+      {
+        spender: Address.fromString(contractId),
+        from: Address.fromString(userAddress),
+        to: Address.fromString(contractId),
+        amount: xdr.ScVal.scvU128(new xdr.Uint128(BigInt(amount * 10000000)))
+      }
+    )
+  )
+  .setTimeout(30)
+  .build();
+  
+  // Sign and submit
+  tx.sign(adminKeypair);
+  return await rpc.sendTransaction(tx);
+
+  const tx = await Client.set_fees_parameter({fee_numerator:1,fee_denominator:1})
+      const result = await tx.signAndSend();
+      const setSep = await Client.set_sep41({sep41_address:"GCIJTC6TYZPGBVOOVVNAKXLWNKD7YSDRDXNSLG6GTIZTEQAOMPPHMKWX"})
+      const result2 = await setSep.signAndSend();
+
+      const approve = await  
+      console.log({result})
+      console.log({result2})
+}
+
+// Helper function to get the Stellar Asset Contract ID for an asset
       // Update the current value if the transaction is successful
-      currentValue.innerHTML = result.toString();
+      // currentValue.innerHTML = result.toString();
     } catch (e) {
       console.error("Transaction failed:", e);
       alert("Transaction failed. Check the console for more details.");

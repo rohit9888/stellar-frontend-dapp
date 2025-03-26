@@ -1,12 +1,11 @@
 
-import freighterApi from "@stellar/freighter-api";
 
 import {
   allowAllModules,
   FREIGHTER_ID,
   StellarWalletsKit,
 } from "@creit.tech/stellar-wallets-kit";
-
+import BigNumber from "bignumber.js";
 const SELECTED_WALLET_ID = "selectedWalletId";
 
 function getSelectedWalletId() {
@@ -80,7 +79,13 @@ export const signTransaction = kit.signTransaction.bind(kit);
     });
   }
 
-   
+  export const xlmToStroop = (lumens) => {
+    if (lumens instanceof BigNumber) {
+      return lumens.times(1e7);
+    }
+    // round to nearest stroop
+    return new BigNumber(Math.round(Number(lumens) * 1e7));
+  };
   // async function getPublicKey() {
   //   try{
   //   const publicKey = await freighterApi.requestAccess();

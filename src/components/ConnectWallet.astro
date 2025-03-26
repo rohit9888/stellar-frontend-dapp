@@ -29,7 +29,8 @@
 </style>
 
 <script>
-import { CheckWalletConnect,getPublicKey } from "./ConnectWallet";
+import { getPublicKey, connect, disconnect } from "/home/rohit/gorillaPay-astro/src/components/stellar-wallets-kit.js";
+
 
   const ellipsis = document.querySelector(
     "#connect-wrap .ellipsis",
@@ -49,7 +50,6 @@ import { CheckWalletConnect,getPublicKey } from "./ConnectWallet";
   async function showConnected() {
     const publicKey = await getPublicKey();
     if (publicKey) {
-      console.log(publicKey);
       ellipsis.innerHTML = `Signed in as ${publicKey}`;
       ellipsis.title = publicKey ?? "";
       connectButton.style.display = "none";
@@ -60,12 +60,11 @@ import { CheckWalletConnect,getPublicKey } from "./ConnectWallet";
   }
 
   connectButton.addEventListener("click", async () => {
-    await CheckWalletConnect();
-    await showConnected();
+    await connect(showConnected);
   });
 
   disconnectButton.addEventListener("click", async () => {
-    // disconnect(showDisconnected);
+    disconnect(showDisconnected);
   });
 
   if (await getPublicKey()) {
